@@ -1,0 +1,7 @@
+# netbeans
+nbproject/
+nb-configuration.xml
+nbactions.xml
+
+# mvn
+target/
