@@ -22,9 +22,13 @@
  */
 package org.schlibbuz.goldie;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -45,9 +49,10 @@ import org.jsoup.select.Elements;
 public class SimpleMiner implements Miner {
 
     private static final Logger w = LogManager.getLogger(SimpleMiner.class);
-    private static final String followupUrlSuffix = "unicode-utf8-table.pl";
+    private static final String FOLLOWUP_URL_SUFFIX = "unicode-utf8-table.pl";
+    private static final String DUMP_FILE_NAME = "utf8.data";
 
-    private final Set<Byte> charSet;
+    private final Set<Character> charSet;
     private final URL baseUrl;
 
 
@@ -59,16 +64,23 @@ public class SimpleMiner implements Miner {
 
     @Override
     public void mine() {
+        File dumpFile = new File(DUMP_FILE_NAME);
+        if(dumpFile.exists()) {
+            w.info("Data is already dumped");
+        }
         w.trace("Getting data from -> " + baseUrl);
         Document doc = getDocument(baseUrl.toString());
         addUTF8Set(doc); // first request is GET, subsequents are POST
-        final String followupUrl = baseUrl + followupUrlSuffix;
+        final String followupUrl = baseUrl + FOLLOWUP_URL_SUFFIX;
         getFollowupIds(doc).stream().forEach(id -> {
             Map<String, String> params = new HashMap<>();
             params.put("start", id);
-            getDocument(followupUrl, params);
+            addUTF8Set(
+                    getDocument(followupUrl, params)
+            );
 
         });
+        dump();
     }
 
     private Document getDocument(final String url) {
@@ -108,7 +120,7 @@ public class SimpleMiner implements Miner {
             String s = elem.text().trim();
             //illegal parse or blacklisted
             if (s.length() != 1 || isBlacklisted(s)) return;
-            charSet.add(s.getBytes()[0]);
+            charSet.add(s.charAt(0));
         });
     }
 
@@ -116,6 +128,25 @@ public class SimpleMiner implements Miner {
 
     private boolean isBlacklisted(String s) {
         return blacklist.contains(s);
+    }
+
+    private void dump() {
+
+        try(PrintWriter pw = new PrintWriter(
+                Files.newBufferedWriter(
+                    Paths.get(DUMP_FILE_NAME)
+                )
+        )) {
+            var it = charSet.iterator();
+            int charsWritten = 0;
+            while(it.hasNext()) {
+                pw.print(it.next());
+                if(++charsWritten % 100 == 0) pw.print("\n");
+            }
+        } catch(IOException e) {
+            w.error(e.getMessage());
+        }
+
     }
 
 }

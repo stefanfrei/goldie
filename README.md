@@ -1,1 +1,1 @@
-# goldie
+# goldie - Mine UTF-8
